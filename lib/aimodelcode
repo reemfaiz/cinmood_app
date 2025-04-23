@@ -1,1 +1,46 @@
+!pip install scikit-learn wget
 
+
+import librosa
+import numpy as np
+from keras.utils import to_categorical
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Activation
+import wget
+
+wget.download("https://github.com/Jakobovski/free-spoken-digit-dataset/raw/master/recordings/0_george_0.wav", "sample.wav")
+
+
+def extract_features(file_name):
+    X, sample_rate = librosa.load(file_name, sr=None)
+    stft = np.abs(librosa.stft(X))
+    mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T, axis=0)
+    chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T, axis=0)
+    mel = np.mean(librosa.feature.melspectrogram(y=X, sr=sample_rate).T, axis=0)
+    return np.hstack([mfccs, chroma, mel])
+
+
+def load_single_file(filepath, label):
+    features = extract_features(filepath)
+    return np.array([features]), to_categorical([label], num_classes=8)
+
+X, y = load_single_file("sample.wav", 4)  
+
+model = Sequential()
+model.add(Dense(256, input_shape=(X.shape[1],)))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+model.add(Dense(128))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+model.add(Dense(8))
+model.add(Activation('softmax'))
+
+model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+
+model.fit(X, y, epochs=10, batch_size=1)
+
+
+prediction = model.predict(X)
+print("Predicted label:", np.argmax(prediction))
